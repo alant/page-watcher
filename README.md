@@ -44,3 +44,9 @@ sudo systemctl disable page-watcher
 sudo rm /etc/systemd/system/page-watcher.service
 sudo systemctl daemon-reload
 ```
+
+update the code on server:
+```bash
+git pull origin main
+sudo systemctl restart page-watcher
+```
