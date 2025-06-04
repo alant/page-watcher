@@ -9,6 +9,8 @@ import time
 from datetime import datetime
 from urllib.parse import urlparse, quote
 import logging
+from urllib.parse import urlparse, quote, parse_qs
+
 
 BASE_DIR = Path.cwd()
 
@@ -93,9 +95,17 @@ def send_telegram_message(text):
 
 def slugify_url(url):
     parsed = urlparse(url)
-    path = parsed.path.replace("/", "_") or "root"
     netloc = parsed.netloc.replace(":", "_")
-    return quote(f"{netloc}{path}")
+    path = parsed.path.strip("/").replace("/", "_") or "root"
+
+    # Special case for midpen-housing.org
+    if "midpen-housing.org" in netloc:
+        qs = parse_qs(parsed.query)
+        county = qs.get("aspf[county__4]", ["unknown"])[0].replace(" ", "_").lower()
+        return f"{netloc}_{path}_county_{county}"
+
+    # Fallback
+    return quote(f"{netloc}_{path}")
 
 
 def get_storage_paths(slug):
