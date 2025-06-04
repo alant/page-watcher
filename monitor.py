@@ -97,11 +97,16 @@ def slugify_url(url):
     parsed = urlparse(url)
     netloc = parsed.netloc.replace(":", "_")
     path = parsed.path.strip("/").replace("/", "_") or "root"
+    qs = parse_qs(parsed.query)
 
-    # Special case for midpen-housing.org
+    # Handle midpen-housing.org
     if "midpen-housing.org" in netloc:
-        qs = parse_qs(parsed.query)
         county = qs.get("aspf[county__4]", ["unknown"])[0].replace(" ", "_").lower()
+        return f"{netloc}_{path}_county_{county}"
+
+    # Handle edenhousing.org
+    if "edenhousing.org" in netloc:
+        county = qs.get("_sft_county", ["unknown"])[0].replace(" ", "_").lower()
         return f"{netloc}_{path}_county_{county}"
 
     # Fallback
