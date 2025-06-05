@@ -7,7 +7,7 @@ pip install -r requirements.txt
 edit .env file according to .env.example, currently it uses TG bot to send notification
 
 ```bash
-./run.sh
+python3 monitor.py
 ```
 
 to run the service as a linux demon:
