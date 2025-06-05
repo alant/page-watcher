@@ -9,12 +9,10 @@ import time
 from datetime import datetime
 from urllib.parse import urlparse, quote, parse_qs
 from dotenv import load_dotenv
-
+load_dotenv()
 # Logging setup
 import logging
 BASE_DIR = Path.cwd()
-
-load_dotenv(BASE_DIR / ".env")
 
 log_file = BASE_DIR / "monitor.log"
 logging.basicConfig(
