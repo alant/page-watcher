@@ -1,75 +1,54 @@
-#!/usr/bin/env python3
-
 import os
-import time
-import requests
 import logging
-from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 from dotenv import load_dotenv
+from pathlib import Path
 
-# Load .env from current directory
-BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(BASE_DIR / ".env")
+from monitor import parse_interval, send_telegram_message  # import both from monitor.py
 
-# Log and config paths
-MONITOR_LOG = BASE_DIR / "monitor.log"
+BASE_DIR = Path(__file__).parent.resolve()
+LOG_FILE = BASE_DIR / "monitor.log"
 WATCHDOG_LOG = BASE_DIR / "watchdog.log"
 
-# Telegram config from .env
-BOT_TOKEN = os.getenv("TG_BOT_TOKEN")
-CHAT_ID = os.getenv("TG_CHAT_ID")
+load_dotenv(BASE_DIR / ".env")
 
-# Time threshold
-THRESHOLD_HOURS = 3
-
-# Logging setup
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler(WATCHDOG_LOG),
-        logging.StreamHandler()
-    ]
+    handlers=[logging.FileHandler(WATCHDOG_LOG), logging.StreamHandler()]
 )
 log = logging.getLogger(__name__)
 
-def send_telegram_message(text):
-    if not BOT_TOKEN or not CHAT_ID:
-        log.warning("TG_BOT_TOKEN or TG_CHAT_ID not set in .env")
-        return
+CHECK_INTERVAL_STR = os.getenv("CHECK_INTERVAL", "3h")
+
+def main():
     try:
-        response = requests.post(
-            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            data={
-                "chat_id": CHAT_ID,
-                "text": text,
-                "parse_mode": "Markdown"
-            },
-            timeout=10
-        )
-        log.info(f"Sent Telegram message: {response.status_code}")
+        threshold_seconds = parse_interval(CHECK_INTERVAL_STR)
     except Exception as e:
-        log.error(f"Failed to send Telegram message: {e}")
+        log.error(f"Invalid CHECK_INTERVAL format: {e}")
+        threshold_seconds = 3 * 3600  # fallback 3 hours
 
-def check_log_activity():
-    if not MONITOR_LOG.exists():
-        log.error("monitor.log does not exist.")
-        send_telegram_message("🚨 *monitor.log is missing!*")
+    if not LOG_FILE.exists():
+        log.error(f"{LOG_FILE} does not exist.")
+        send_telegram_message(f"⚠️ Warning: `{LOG_FILE.name}` does not exist on server!")
         return
 
-    last_modified = datetime.fromtimestamp(MONITOR_LOG.stat().st_mtime)
+    last_modified = datetime.fromtimestamp(LOG_FILE.stat().st_mtime)
     now = datetime.now()
-    delta = now - last_modified
+    diff = now - last_modified
 
-    log.info(f"monitor.log last updated: {last_modified.strftime('%Y-%m-%d %H:%M:%S')} ({delta.total_seconds() / 60:.1f} minutes ago)")
+    log.info(f"Last monitor.log modification: {last_modified} ({diff.total_seconds()/3600:.2f} hours ago)")
 
-    if delta > timedelta(hours=THRESHOLD_HOURS):
-        send_telegram_message(
-            f"⚠️ *No activity in monitor.log for over {THRESHOLD_HOURS} hours!*\nLast update: `{last_modified.strftime('%Y-%m-%d %H:%M:%S')}`"
+    if diff.total_seconds() > threshold_seconds:
+        message = (
+            f"🚨 *Alert*: The log file `{LOG_FILE.name}` was last updated "
+            f"{diff.total_seconds() / 3600:.2f} hours ago, which exceeds the "
+            f"threshold of `{CHECK_INTERVAL_STR}`.\n"
+            "The page watcher may have stopped running."
         )
+        send_telegram_message(message)
     else:
-        log.info("monitor.log is recent enough. No alert sent.")
+        log.info("Log file update time within threshold.")
 
 if __name__ == "__main__":
-    check_log_activity()
+    main()
