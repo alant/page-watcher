@@ -50,3 +50,6 @@ update the code on server:
 git pull origin main
 sudo systemctl restart page-watcher
 ```
+
+add the watchdog to crontab:
+```bash
