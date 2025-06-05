@@ -9,11 +9,11 @@ import time
 from datetime import datetime
 from urllib.parse import urlparse, quote, parse_qs
 from dotenv import load_dotenv
-load_dotenv()
-# Logging setup
 import logging
-BASE_DIR = Path.cwd()
 
+load_dotenv()
+
+BASE_DIR = Path.cwd()
 log_file = BASE_DIR / "monitor.log"
 logging.basicConfig(
     level=logging.INFO,
@@ -198,8 +198,9 @@ def format_sleep_time(seconds):
         return f"{seconds // 3600} hours"
 
 def main():
+    all_urls = set(URLS) | set(SPECIAL_LINK_MONITORS.keys())
     while True:
-        for url in URLS:
+        for url in all_urls:
             monitor_page(url)
         log.info(f"Sleeping for {format_sleep_time(CHECK_INTERVAL)}...")
         time.sleep(CHECK_INTERVAL)
