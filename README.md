@@ -53,3 +53,9 @@ sudo systemctl restart page-watcher
 
 add the watchdog to crontab:
 ```bash
+sudo crontab -e
+```
+add the following to run the watchdog every 30 minutes
+```cron
+*/30 * * * * /home/ubuntu/page-watcher/venv/bin/python /home/ubuntu/page-watcher/watchdog.py >> /home/ubuntu/page-watcher/cron.log 2>&1
+```
