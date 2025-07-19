@@ -27,6 +27,6 @@ jobs:
           PASSWORD: ${{ secrets.PASSWORD }}
           LOGIN_URL: ${{ secrets.LOGIN_URL }}
           PING_NEXT: ${{ secrets.PING_NEXT }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: python keep_render_alive.py
