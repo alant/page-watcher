@@ -1,7 +1,7 @@
 import os
 import requests
 from dotenv import load_dotenv
-from monitor import send_telegram_message
+from telegram_bot import send_telegram_message
 
 load_dotenv()
 
@@ -16,7 +16,7 @@ def main():
     # Check Next.js ping
     try:
         r_next = requests.get(PING_NEXT, timeout=10)
-        if r_next.status_code != 200 or r_next.json().get("status") != "ok":
+        if r_next.status_code != 200 or r_next.text.strip() != "pong":
             errors.append(f"Next.js ping failed: status={r_next.status_code}, body={r_next.text}")
     except Exception as e:
         errors.append(f"Next.js ping exception: {e}")
@@ -32,9 +32,9 @@ def main():
 
     # Send alert if errors found
     if errors:
-        msg = "*Render App Monitor Alert*\n\n" + "\n".join(errors)
-        print(msg)
-        send_telegram_message(msg)
+        text = "*Render App Monitor Alert*\n\n" + "\n".join(errors)
+        print(text)
+        send_telegram_message(text, "None")
     else:
         print("All checks passed.")
 

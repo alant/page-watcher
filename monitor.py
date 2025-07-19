@@ -10,6 +10,7 @@ from datetime import datetime
 from urllib.parse import urlparse, quote, parse_qs
 from dotenv import load_dotenv
 import logging
+from telegram_bot import send_telegram_message
 
 load_dotenv()
 
@@ -90,25 +91,6 @@ def clean_html(html):
 
 def hash_content(text):
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-def send_telegram_message(text):
-    if not BOT_TOKEN or not CHAT_ID:
-        log.warning("Telegram bot token or chat ID is not set.")
-        return
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    MAX_LEN = 2000
-    text = text[:MAX_LEN]
-    data = {
-        "chat_id": CHAT_ID,
-        "text": text,
-        "parse_mode": "Markdown",
-        "disable_web_page_preview": False
-    }
-    try:
-        response = requests.post(url, data=data)
-        log.debug(f"Telegram status code: {response.status_code}")
-    except Exception as e:
-        log.error(f"Failed to send message: {e}")
 
 def slugify_url(url):
     parsed = urlparse(url)
