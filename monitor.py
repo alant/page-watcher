@@ -96,6 +96,8 @@ def send_telegram_message(text):
         log.warning("Telegram bot token or chat ID is not set.")
         return
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    MAX_LEN = 2000
+    text = text[:MAX_LEN]
     data = {
         "chat_id": CHAT_ID,
         "text": text,
