@@ -170,8 +170,8 @@ def extract_midpen_properties(soup):
                     prop["description"] = desc[:200] + "..."
                     break
 
-            # Get location (City, CA)
-            loc_match = re.search(r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?),?\s*CA", section.get_text())
+            # Get location (City, CA) - handle multi-word cities like "Half Moon Bay", "East Palo Alto"
+            loc_match = re.search(r"((?:[A-Z][a-z]+\s+){0,3}[A-Z][a-z]+),?\s*CA", section.get_text())
             if loc_match:
                 prop["location"] = loc_match.group(0)
 
