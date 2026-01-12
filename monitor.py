@@ -140,56 +140,53 @@ def extract_midpen_properties(soup):
     """Extract property listings from MidPen Housing pages."""
     properties = []
     seen_urls = set()
+    status_pattern = re.compile(r"(Wait List Open|Wait List Closed|Interest List|Referral Only)", re.I)
 
-    # Find all property links (skip duplicates - image links vs text links)
-    for link in soup.find_all("a", href=re.compile(r"/property/[^/]+/")):
-        name = link.get_text(strip=True)
+    # Find property links inside headings (h2, h3, h4)
+    for heading in soup.find_all(["h2", "h3", "h4"]):
+        link = heading.find("a", href=lambda h: h and "/property/" in h)
+        if not link:
+            continue
+
         url = link.get("href", "")
-
-        # Skip empty names or duplicates
-        if not name or url in seen_urls:
+        if url in seen_urls:
             continue
         seen_urls.add(url)
 
+        name = heading.get_text(strip=True)
+        if not name:
+            continue
+
         prop = {"name": name, "url": url}
 
-        # Walk up to find the main content container (look for elementor-top-section)
-        section = link.find_parent("section", class_=re.compile(r"elementor-section"))
-
+        # Find parent section for description and location
+        section = heading.find_parent("section")
         if section:
             # Get description from paragraphs
             paragraphs = section.find_all("p")
-            if paragraphs:
-                desc = paragraphs[0].get_text(strip=True)
-                if len(desc) > 50:  # Only if it's a real description
+            for p in paragraphs:
+                desc = p.get_text(strip=True)
+                if len(desc) > 50:  # Real description, not just a label
                     prop["description"] = desc[:200] + "..."
+                    break
 
-            # Get location (city, CA)
-            loc = section.find(string=re.compile(r"[A-Z][a-z]+,?\s*CA$"))
-            if loc:
-                prop["location"] = loc.strip()
+            # Get location (City, CA)
+            loc_match = re.search(r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?),?\s*CA", section.get_text())
+            if loc_match:
+                prop["location"] = loc_match.group(0)
 
-        # Look for status and type in preceding sections
-        # These appear in separate sections before the property card
-        prev_sections = []
-        prev = section.find_previous_sibling("section") if section else None
-        for _ in range(3):  # Look at up to 3 preceding sections
-            if prev:
-                prev_sections.append(prev)
-                prev = prev.find_previous_sibling("section")
-
-        for prev_sec in prev_sections:
-            text = prev_sec.get_text(separator=" ", strip=True)
-            # Status
-            if not prop.get("status") and re.search(r"Wait List Open|Wait List Closed|Interest List|Referral Only", text):
-                match = re.search(r"(Wait List Open|Wait List Closed|Interest List|Referral Only)", text)
+        # Look backwards in sibling sections for status
+        if section:
+            prev = section.find_previous_sibling("section")
+            for _ in range(5):  # Check up to 5 preceding sections
+                if not prev:
+                    break
+                text = prev.get_text(strip=True)
+                match = status_pattern.search(text)
                 if match:
                     prop["status"] = match.group(1)
-            # Type
-            if not prop.get("type") and re.search(r"Family|Senior|Supportive", text):
-                match = re.search(r"((?:Family,?\s*)?(?:Senior,?\s*)?(?:Supportive,?\s*)?(?:Special Needs)?)", text)
-                if match and match.group(1).strip():
-                    prop["type"] = match.group(1).strip().rstrip(",")
+                    break
+                prev = prev.find_previous_sibling("section")
 
         properties.append(prop)
 
@@ -462,30 +459,34 @@ def clean_html(html, url=""):
             properties = extract_midpen_properties(soup)
             if properties:
                 return format_properties(properties, "MidPen Housing")
-            # Fallback if extraction fails
-            log.warning(f"MidPen extraction returned no properties, using fallback")
+            else:
+                # No properties found for this filter - that's valid, not a fallback
+                return "[MidPen Housing] No senior properties found in this county.\n"
 
         if "edenhousing.org" in url:
             properties = extract_eden_properties(soup)
             if properties:
                 return format_properties(properties, "Eden Housing")
-            log.warning(f"Eden extraction returned no properties, using fallback")
+            else:
+                return "[Eden Housing] No senior properties found in this county.\n"
 
         if "humangood.org" in url:
             properties = extract_humangood_properties(soup)
             if properties:
                 return format_properties(properties, "HumanGood")
-            log.warning(f"HumanGood extraction returned no properties, using fallback")
+            else:
+                return "[HumanGood] No properties found.\n"
 
         if "sahahomes.org" in url:
             properties = extract_saha_properties(soup)
             if properties:
-                # Filter to only seniors and accepting applications for cleaner output
+                # Filter to only seniors for cleaner output
                 senior_props = [p for p in properties if p.get("type") == "Senior"]
                 if senior_props:
                     return format_properties(senior_props, "SAHA Homes (Senior)")
                 return format_properties(properties, "SAHA Homes")
-            log.warning(f"SAHA extraction returned no properties, using fallback")
+            else:
+                return "[SAHA Homes] No properties found.\n"
 
         if "charitieshousing.org" in url:
             properties = extract_charities_housing(soup)
@@ -495,7 +496,8 @@ def clean_html(html, url=""):
                 if senior_props:
                     return format_properties(senior_props, "Charities Housing (Senior)")
                 return format_properties(properties, "Charities Housing")
-            log.warning(f"Charities Housing extraction returned no properties, using fallback")
+            else:
+                return "[Charities Housing] No properties found.\n"
 
         # Generic housing extractor for other housing sites
         housing_domains = [

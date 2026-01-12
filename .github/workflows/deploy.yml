@@ -20,5 +20,6 @@ jobs:
           script: |
             cd /home/ubuntu/page-watcher
             git pull origin main
+            ./venv/bin/pip install -r requirements.txt --quiet
             sudo systemctl restart page-watcher
             echo "Deployed at $(date)"
