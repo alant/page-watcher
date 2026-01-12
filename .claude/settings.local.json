@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.midpen-housing.org)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)",
+      "Bash(cat:*)",
+      "WebSearch",
+      "Bash(source:*)",
+      "Bash(./venv/bin/python3:*)",
+      "Bash(./venv/bin/pip install:*)",
+      "Bash(python:*)",
+      "Bash(./venv/bin/python:*)"
+    ]
+  }
+}

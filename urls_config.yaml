@@ -1,0 +1,97 @@
+# Page Watcher URL Configuration
+# This file contains all URLs to monitor, organized by category
+# These are not secrets - just application configuration
+
+# =============================================================================
+# SCHOOL URLs
+# =============================================================================
+school:
+  - name: FUHSD Adult School ESL
+    url: https://www.fuhsdadultschool.com/esl
+
+  - name: FUHSD ESL Testing
+    url: https://sites.google.com/fuhsd.org/esl-testing/home
+
+# =============================================================================
+# HOUSING URLs - MidPen Housing
+# Senior housing - ALL statuses (waitlist open, closed, etc.)
+# Any change to any property triggers notification
+# Counties: Santa Clara, Alameda, San Mateo, San Francisco
+# =============================================================================
+midpen:
+  - name: MidPen Santa Clara
+    url: https://www.midpen-housing.org/find-housing/?p_asid=1&p_asp_data=1&aspf[county__4]=Santa%20Clara&aspf[city__3]=&aspf[type__2]=Senior&filters_initial=0&filters_changed=1&qtranslate_lang=0&current_page_id=23&asp_ls=
+
+  - name: MidPen Alameda
+    url: https://www.midpen-housing.org/find-housing/?p_asid=1&p_asp_data=1&aspf[county__4]=Alameda&aspf[city__3]=&aspf[type__2]=Senior&filters_initial=0&filters_changed=1&qtranslate_lang=0&current_page_id=23&asp_ls=
+
+  - name: MidPen San Mateo
+    url: https://www.midpen-housing.org/find-housing/?p_asid=1&p_asp_data=1&aspf[county__4]=San%20Mateo&aspf[city__3]=&aspf[type__2]=Senior&filters_initial=0&filters_changed=1&qtranslate_lang=0&current_page_id=23&asp_ls=
+
+  - name: MidPen San Francisco
+    url: https://www.midpen-housing.org/find-housing/?p_asid=1&p_asp_data=1&aspf[county__4]=San%20Francisco&aspf[city__3]=&aspf[type__2]=Senior&filters_initial=0&filters_changed=1&qtranslate_lang=0&current_page_id=23&asp_ls=
+
+# =============================================================================
+# HOUSING URLs - Eden Housing
+# Senior housing filter
+# Counties: Santa Clara, Alameda
+# =============================================================================
+eden:
+  - name: Eden Santa Clara
+    url: https://edenhousing.org/find-an-apartment/find-a-home/search-for-an-apartment/?_sft_community_type=senior&_sft_county=santa-clara
+
+  - name: Eden Alameda
+    url: https://edenhousing.org/find-an-apartment/find-a-home/search-for-an-apartment/?_sft_community_type=senior&_sft_county=alameda
+
+# =============================================================================
+# HOUSING URLs - Other Major Providers
+# =============================================================================
+other_housing:
+  - name: HumanGood Life's Garden
+    url: https://www.humangood.org/lifes-garden
+    description: Senior affordable housing in San Jose
+
+  - name: SAHA Homes Properties
+    url: https://www.sahahomes.org/properties/
+    description: Affordable housing in Alameda and Contra Costa counties
+
+  - name: Charities Housing Santa Clara
+    url: https://charitieshousing.org/find-a-home/
+    description: Santa Clara County affordable housing nonprofit - property listings
+
+  - name: HIP Housing San Mateo
+    url: https://hiphousing.org/programs/properties/find-housing/?county=san-mateo
+    description: San Mateo County affordable housing
+
+  # BRIDGE Housing removed - /properties page only shows development projects, no waitlist info
+  # Mercy Housing removed - state-level page, no specific property waitlist info
+
+# =============================================================================
+# HOUSING URLs - County/City Portals
+# These pages list multiple properties and waitlist openings
+# =============================================================================
+portals:
+  - name: Foster City Waitlists
+    url: https://www.fostercity.org/commdev/page/affordable-housing-open-waitlists
+    description: Foster City affordable housing with open waitlists
+
+  - name: AC Housing Choices (Alameda)
+    url: https://achousingchoices.org/
+    description: Alameda County housing search portal
+
+  - name: EBHO Looking for Housing
+    url: https://ebho.org/looking-for-housing/
+    description: East Bay Housing Organizations resource page
+
+  - name: Agrihood Senior San Jose
+    url: https://liveatagrihood.com/
+    description: New senior affordable housing in Santa Clara
+
+# =============================================================================
+# SPECIAL LINK MONITORS
+# Monitor specific link text changes on pages
+# Format: url|link_text_to_monitor
+# =============================================================================
+special_link_monitors:
+  - url: https://www.fuhsdadultschool.com/esl
+    link_text: REGISTER HERE TO LEARN ENGLISH
