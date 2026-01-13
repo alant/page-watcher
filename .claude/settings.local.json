@@ -11,7 +11,13 @@
       "Bash(./venv/bin/python3:*)",
       "Bash(./venv/bin/pip install:*)",
       "Bash(python:*)",
-      "Bash(./venv/bin/python:*)"
+      "Bash(./venv/bin/python:*)",
+      "WebFetch(domain:www.theunitedeffort.org)",
+      "Bash(grep:*)",
+      "WebFetch(domain:frontporch.net)",
+      "WebFetch(domain:caringhousingministries.org)",
+      "WebFetch(domain:chm.org)",
+      "WebFetch(domain:www.chm.org)"
     ]
   }
 }

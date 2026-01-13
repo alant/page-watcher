@@ -88,6 +88,24 @@ portals:
     description: New senior affordable housing in Santa Clara
 
 # =============================================================================
+# HOUSING URLs - The United Effort Organization
+# Santa Clara County affordable housing aggregator (562+ properties)
+# =============================================================================
+united_effort:
+  - name: United Effort Senior Housing
+    url: https://www.theunitedeffort.org/housing/affordable-housing/?populations=seniors
+    description: The United Effort - Santa Clara County senior housing aggregator (includes Sunny View West, Lytton Gardens, 560+ properties)
+
+# =============================================================================
+# HOUSING URLs - CHM (CARING Housing Ministries) / Front Porch
+# Bay Area affordable senior housing communities
+# =============================================================================
+chm:
+  - name: CHM Communities
+    url: https://www.chm.org/community-management/our-communities/
+    description: CARING Housing Ministries - all Bay Area affordable communities
+
+# =============================================================================
 # SPECIAL LINK MONITORS
 # Monitor specific link text changes on pages
 # Format: url|link_text_to_monitor

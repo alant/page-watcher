@@ -53,7 +53,7 @@ def load_urls_config():
                 config = yaml.safe_load(f)
 
             # Collect URLs from all categories
-            for category in ["school", "midpen", "eden", "other_housing", "portals"]:
+            for category in ["school", "midpen", "eden", "other_housing", "portals", "united_effort", "chm"]:
                 if category in config and config[category]:
                     for item in config[category]:
                         if isinstance(item, dict) and "url" in item:
@@ -363,6 +363,95 @@ def extract_charities_housing(soup):
 
     return properties
 
+def extract_united_effort_properties(soup):
+    """Extract property listings from The United Effort Organization pages."""
+    properties = []
+
+    # Find the results container
+    results = soup.find(class_=lambda x: x and 'results_container' in x)
+    if not results:
+        return None
+
+    # Properties are in anchor tags with property links
+    for link in results.find_all('a', href=lambda h: h and '/affordable-housing/' in h):
+        text = link.get_text(separator=' | ', strip=True)
+        if not text or len(text) < 5:
+            continue
+
+        # Parse the property info
+        parts = [p.strip() for p in text.split('|') if p.strip()]
+        if not parts:
+            continue
+
+        name = parts[0] if parts else "Unknown"
+
+        # Look for status and unit types
+        status = ""
+        units = []
+        address = ""
+
+        for part in parts[1:]:
+            if 'waitlist' in part.lower() or 'open' in part.lower() or 'closed' in part.lower():
+                status = part
+            elif 'bedroom' in part.lower() or 'studio' in part.lower() or 'sro' in part.lower():
+                units.append(part)
+            elif any(c.isdigit() for c in part) and (',' in part or any(city in part.lower() for city in ['san jose', 'palo alto', 'mountain view', 'sunnyvale', 'cupertino', 'santa clara', 'milpitas', 'fremont', 'oakland'])):
+                address = part
+
+        prop = {"name": name}
+        if status:
+            prop["status"] = status
+        if units:
+            prop["types"] = ", ".join(units)
+        if address:
+            prop["address"] = address
+
+        # Avoid duplicates
+        if prop.get("name") and not any(p.get("name") == prop["name"] for p in properties):
+            properties.append(prop)
+
+    return properties if properties else None
+
+
+def extract_chm_communities(soup):
+    """Extract community listings from CHM (CARING Housing Ministries) pages."""
+    properties = []
+
+    # Bay Area locations to filter for
+    bay_area_cities = [
+        'san francisco', 'oakland', 'san jose', 'palo alto', 'cupertino',
+        'mountain view', 'sunnyvale', 'santa clara', 'fremont', 'hayward',
+        'berkeley', 'santa rosa', 'san mateo', 'redwood city', 'daly city',
+        'milpitas', 'concord', 'richmond', 'vallejo', 'antioch'
+    ]
+
+    # Known Bay Area CHM senior communities (from their website)
+    known_communities = {
+        'Bethany Center': 'San Francisco, CA 94110',
+        'Fellowship Manor': 'San Francisco, CA 94115',
+        'Jennings Court': 'Santa Rosa, CA 95401',
+        'Lytton Gardens': 'Palo Alto, CA 94301',
+        'Lytton Gardens II': 'Palo Alto, CA 94301',
+        'Lytton Gardens IV': 'Palo Alto, CA 94301',
+        'Oak Center Towers': 'Oakland, CA 94607',
+        'Presidio Gate Apartments': 'San Francisco, CA 94123',
+        'Shires Memorial Center': 'San Jose, CA 95112',
+        'Sunny View West': 'Cupertino, CA 95014',
+    }
+
+    text = soup.get_text()
+
+    # Check which known communities appear on the page
+    for name, address in known_communities.items():
+        if name.lower() in text.lower():
+            properties.append({
+                "name": name,
+                "address": address,
+            })
+
+    return properties if properties else None
+
+
 def extract_generic_housing(soup, url):
     """Generic extractor for housing sites - captures key housing-related content."""
     lines = []
@@ -500,6 +589,20 @@ def clean_html(html, url=""):
                 return format_properties(properties, "Charities Housing")
             else:
                 return "[Charities Housing] No properties found.\n"
+
+        if "theunitedeffort.org" in url:
+            properties = extract_united_effort_properties(soup)
+            if properties:
+                return format_properties(properties, "The United Effort (Senior)")
+            else:
+                return "[The United Effort] No senior properties found.\n"
+
+        if "chm.org" in url:
+            properties = extract_chm_communities(soup)
+            if properties:
+                return format_properties(properties, "CHM Bay Area Senior Housing")
+            else:
+                return "[CHM] No Bay Area communities found.\n"
 
         # Generic housing extractor for other housing sites
         housing_domains = [

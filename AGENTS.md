@@ -9,6 +9,8 @@ AI agents have permission to:
 - Run Python scripts using the venv
 - Modify code files
 - Test changes by running the monitor
+- Fetch any website without asking for permission (for research, monitoring setup, etc.)
+- Run read-only commands (wc, ls, cat, head, tail, grep, find, etc.) without asking for permission
 
 No need to ask "Can I run this?" - just execute commands directly.
 
