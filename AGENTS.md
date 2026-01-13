@@ -11,6 +11,7 @@ AI agents have permission to:
 - Test changes by running the monitor
 - Fetch any website without asking for permission (for research, monitoring setup, etc.)
 - Run read-only commands (wc, ls, cat, head, tail, grep, find, etc.) without asking for permission
+- Run any Python code to validate, test, or debug things without asking for permission (including heredoc scripts like `./venv/bin/python3 << 'EOF'`)
 
 No need to ask "Can I run this?" - just execute commands directly.
 

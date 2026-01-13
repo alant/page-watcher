@@ -53,57 +53,33 @@ other_housing:
 
   - name: SAHA Homes Properties
     url: https://www.sahahomes.org/properties/
-    description: Affordable housing in Alameda and Contra Costa counties
+    description: Senior affordable housing in Alameda and Contra Costa counties (Bay Area only)
 
   - name: Charities Housing Santa Clara
     url: https://charitieshousing.org/find-a-home/
     description: Santa Clara County affordable housing nonprofit - property listings
 
-  - name: HIP Housing San Mateo
-    url: https://hiphousing.org/programs/properties/find-housing/?county=san-mateo
-    description: San Mateo County affordable housing
-
-  # BRIDGE Housing removed - /properties page only shows development projects, no waitlist info
-  # Mercy Housing removed - state-level page, no specific property waitlist info
+  # HIP Housing removed - no senior-specific content
+  # AC Housing Choices removed - no senior-specific content
+  # EBHO removed - just resource links, not property listings
+  # Agrihood removed - already covered by United Effort
 
 # =============================================================================
 # HOUSING URLs - County/City Portals
-# These pages list multiple properties and waitlist openings
 # =============================================================================
 portals:
   - name: Foster City Waitlists
     url: https://www.fostercity.org/commdev/page/affordable-housing-open-waitlists
-    description: Foster City affordable housing with open waitlists
-
-  - name: AC Housing Choices (Alameda)
-    url: https://achousingchoices.org/
-    description: Alameda County housing search portal
-
-  - name: EBHO Looking for Housing
-    url: https://ebho.org/looking-for-housing/
-    description: East Bay Housing Organizations resource page
-
-  - name: Agrihood Senior San Jose
-    url: https://liveatagrihood.com/
-    description: New senior affordable housing in Santa Clara
+    description: Foster City/San Mateo County senior housing waitlists
 
 # =============================================================================
 # HOUSING URLs - The United Effort Organization
-# Santa Clara County affordable housing aggregator (562+ properties)
+# Santa Clara County senior-only affordable housing
 # =============================================================================
 united_effort:
   - name: United Effort Senior Housing
     url: https://www.theunitedeffort.org/housing/affordable-housing/?populations=seniors
-    description: The United Effort - Santa Clara County senior housing aggregator (includes Sunny View West, Lytton Gardens, 560+ properties)
-
-# =============================================================================
-# HOUSING URLs - CHM (CARING Housing Ministries) / Front Porch
-# Bay Area affordable senior housing communities
-# =============================================================================
-chm:
-  - name: CHM Communities
-    url: https://www.chm.org/community-management/our-communities/
-    description: CARING Housing Ministries - all Bay Area affordable communities
+    description: Santa Clara County senior-only housing (36 properties including Sunny View West, Lytton Gardens)
 
 # =============================================================================
 # SPECIAL LINK MONITORS

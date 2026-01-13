@@ -53,7 +53,7 @@ def load_urls_config():
                 config = yaml.safe_load(f)
 
             # Collect URLs from all categories
-            for category in ["school", "midpen", "eden", "other_housing", "portals", "united_effort", "chm"]:
+            for category in ["school", "midpen", "eden", "other_housing", "portals", "united_effort"]:
                 if category in config and config[category]:
                     for item in config[category]:
                         if isinstance(item, dict) and "url" in item:
@@ -148,16 +148,18 @@ def extract_midpen_properties(soup):
         if not link:
             continue
 
-        url = link.get("href", "")
-        if url in seen_urls:
+        href = link.get("href", "")
+        if href in seen_urls:
             continue
-        seen_urls.add(url)
+        seen_urls.add(href)
 
         name = heading.get_text(strip=True)
         if not name:
             continue
 
-        prop = {"name": name, "url": url}
+        # Make URL absolute
+        full_url = f"https://www.midpen-housing.org{href}" if href.startswith('/') else href
+        prop = {"name": name, "url": full_url}
 
         # Find parent section for description and location
         section = heading.find_parent("section")
@@ -201,13 +203,14 @@ def extract_eden_properties(soup):
     for listing in soup.find_all("div", class_=re.compile(r"property-listing")):
         prop = {}
 
-        # Get name
+        # Get name and URL
         name_elem = listing.find("h3")
         if name_elem:
             prop["name"] = name_elem.get_text(strip=True)
             link = name_elem.find("a")
             if link:
-                prop["url"] = link.get("href", "")
+                href = link.get("href", "")
+                prop["url"] = f"https://edenhousing.org{href}" if href.startswith('/') else href
 
         # Get status
         status_elem = listing.find("a", class_=re.compile(r"status|applications"))
@@ -232,12 +235,33 @@ def extract_eden_properties(soup):
     return properties
 
 def extract_saha_properties(soup):
-    """Extract property listings from SAHA Homes pages."""
+    """Extract property listings from SAHA Homes pages - Bay Area only."""
     properties = []
+
+    # Core Bay Area cities (Alameda, Contra Costa, SF, Santa Clara counties)
+    bay_area_cities = {
+        'oakland', 'berkeley', 'fremont', 'newark', 'alameda', 'albany',
+        'livermore', 'pleasanton', 'hayward', 'union city', 'san leandro',
+        'antioch', 'pittsburg', 'pleasant hill', 'walnut creek', 'pinole',
+        'san ramon', 'concord', 'richmond', 'el cerrito', 'martinez',
+        'san francisco', 'daly city', 'south san francisco',
+        'san jose', 'sunnyvale', 'santa clara', 'mountain view', 'palo alto',
+        'milpitas', 'cupertino', 'campbell', 'los gatos', 'saratoga',
+    }
 
     # SAHA stores property data in map-popup-item divs with data attributes
     for item in soup.find_all("div", class_="map-popup-item"):
         prop = {}
+
+        # Get city from data attribute first (for filtering)
+        city_attr = item.get("data-limerock-city", "")
+        if city_attr:
+            city = city_attr.strip('[]"').replace("-", " ").title()
+            prop["city"] = city
+
+            # Skip non-Bay Area cities
+            if city.lower() not in bay_area_cities:
+                continue
 
         # Get waitlist status from data attribute
         status_attr = item.get("data-limerock-waitlist-status", "")
@@ -247,11 +271,6 @@ def extract_saha_properties(soup):
             prop["status"] = "Waitlist Closed"
         else:
             prop["status"] = status_attr.strip('[]"').replace("-", " ").title() if status_attr else "Unknown"
-
-        # Get city from data attribute
-        city_attr = item.get("data-limerock-city", "")
-        if city_attr:
-            prop["city"] = city_attr.strip('[]"').replace("-", " ").title()
 
         # Get resident type
         resident_attr = item.get("data-limerock-resident-population", "")
@@ -356,7 +375,8 @@ def extract_charities_housing(soup):
         # Get URL from first meaningful link
         link = card.find("a", href=re.compile(r"/property/"))
         if link:
-            prop["url"] = link.get("href", "")
+            href = link.get("href", "")
+            prop["url"] = f"https://charitieshousing.org{href}" if href.startswith('/') else href
 
         if prop.get("name"):
             properties.append(prop)
@@ -364,39 +384,64 @@ def extract_charities_housing(soup):
     return properties
 
 def extract_united_effort_properties(soup):
-    """Extract property listings from The United Effort Organization pages."""
+    """Extract SENIOR-ONLY property listings from The United Effort Organization pages."""
     properties = []
 
-    # Find the results container
-    results = soup.find(class_=lambda x: x and 'results_container' in x)
-    if not results:
-        return None
+    # Keywords that indicate senior-only housing
+    senior_keywords = ['senior', '62+', '55+', 'elderly', 'older adult']
 
-    # Properties are in anchor tags with property links
-    for link in results.find_all('a', href=lambda h: h and '/affordable-housing/' in h):
-        text = link.get_text(separator=' | ', strip=True)
-        if not text or len(text) < 5:
+    # Each property is in a <li id="property-XXX"> element
+    for li in soup.find_all('li', id=lambda x: x and x.startswith('property-')):
+        # Get property name from h2 > a
+        h2 = li.find('h2')
+        if not h2:
+            continue
+        link = h2.find('a')
+        if not link:
             continue
 
-        # Parse the property info
-        parts = [p.strip() for p in text.split('|') if p.strip()]
-        if not parts:
+        name = link.get_text(strip=True)
+        if not name:
             continue
 
-        name = parts[0] if parts else "Unknown"
+        # Get property URL
+        href = link.get('href', '')
+        if href:
+            prop_url = f"https://www.theunitedeffort.org{href}" if href.startswith('/') else href
+        else:
+            prop_url = ""
 
-        # Look for status and unit types
+        # Check if this is senior-only housing
+        full_text = li.get_text(separator=' ', strip=True).lower()
+        is_senior_only = any(kw in name.lower() or kw in full_text for kw in senior_keywords)
+
+        if not is_senior_only:
+            continue  # Skip non-senior properties
+
+        # Get status from badge classes
         status = ""
-        units = []
-        address = ""
+        status_badge = li.find('span', class_=lambda x: x and 'badge__ok' in x)
+        if status_badge:
+            status = status_badge.get_text(strip=True)  # "Waitlist Open"
+        else:
+            status_badge = li.find('span', class_=lambda x: x and 'badge__bad' in x)
+            if status_badge:
+                status = status_badge.get_text(strip=True)  # "Waitlist Closed"
 
-        for part in parts[1:]:
-            if 'waitlist' in part.lower() or 'open' in part.lower() or 'closed' in part.lower():
-                status = part
-            elif 'bedroom' in part.lower() or 'studio' in part.lower() or 'sro' in part.lower():
-                units.append(part)
-            elif any(c.isdigit() for c in part) and (',' in part or any(city in part.lower() for city in ['san jose', 'palo alto', 'mountain view', 'sunnyvale', 'cupertino', 'santa clara', 'milpitas', 'fremont', 'oakland'])):
-                address = part
+        # Get unit types from other badges
+        units = []
+        for badge in li.find_all('span', class_='badge'):
+            badge_text = badge.get_text(strip=True)
+            if badge_text and badge_text not in ['Waitlist Open', 'Waitlist Closed', 'Call for Availability']:
+                units.append(badge_text)
+
+        # Get address from first contact span
+        address = ""
+        contact_span = li.find('span', attrs={'translate': 'no'})
+        if contact_span:
+            addr_text = contact_span.get_text(strip=True)
+            if ',' in addr_text:  # Looks like an address
+                address = addr_text
 
         prop = {"name": name}
         if status:
@@ -405,49 +450,67 @@ def extract_united_effort_properties(soup):
             prop["types"] = ", ".join(units)
         if address:
             prop["address"] = address
+        if prop_url:
+            prop["url"] = prop_url
 
-        # Avoid duplicates
-        if prop.get("name") and not any(p.get("name") == prop["name"] for p in properties):
-            properties.append(prop)
+        properties.append(prop)
 
     return properties if properties else None
 
 
-def extract_chm_communities(soup):
-    """Extract community listings from CHM (CARING Housing Ministries) pages."""
+def extract_foster_city_properties(soup):
+    """Extract senior housing from Foster City waitlist page."""
     properties = []
 
-    # Bay Area locations to filter for
-    bay_area_cities = [
-        'san francisco', 'oakland', 'san jose', 'palo alto', 'cupertino',
-        'mountain view', 'sunnyvale', 'santa clara', 'fremont', 'hayward',
-        'berkeley', 'santa rosa', 'san mateo', 'redwood city', 'daly city',
-        'milpitas', 'concord', 'richmond', 'vallejo', 'antioch'
-    ]
+    # Find the main table with property listings
+    for table in soup.find_all('table'):
+        rows = table.find_all('tr')
+        if len(rows) < 2:
+            continue
 
-    # Known Bay Area CHM senior communities (from their website)
-    known_communities = {
-        'Bethany Center': 'San Francisco, CA 94110',
-        'Fellowship Manor': 'San Francisco, CA 94115',
-        'Jennings Court': 'Santa Rosa, CA 95401',
-        'Lytton Gardens': 'Palo Alto, CA 94301',
-        'Lytton Gardens II': 'Palo Alto, CA 94301',
-        'Lytton Gardens IV': 'Palo Alto, CA 94301',
-        'Oak Center Towers': 'Oakland, CA 94607',
-        'Presidio Gate Apartments': 'San Francisco, CA 94123',
-        'Shires Memorial Center': 'San Jose, CA 95112',
-        'Sunny View West': 'Cupertino, CA 95014',
-    }
+        # Check if this table has property data
+        for row in rows[1:]:  # Skip header row
+            cells = row.find_all(['td', 'th'])
+            if len(cells) < 5:
+                continue
 
-    text = soup.get_text()
+            # Get cell text
+            cell_text = [c.get_text(strip=True) for c in cells]
 
-    # Check which known communities appear on the page
-    for name, address in known_communities.items():
-        if name.lower() in text.lower():
-            properties.append({
-                "name": name,
-                "address": address,
-            })
+            # Check if this is a senior property
+            name = cell_text[0] if cell_text else ""
+            if 'senior' not in name.lower():
+                continue
+
+            prop = {"name": name}
+
+            # Units count (column 1)
+            if len(cell_text) > 1:
+                prop["units"] = cell_text[1]
+
+            # Affordability (column 2)
+            if len(cell_text) > 2:
+                prop["income_levels"] = cell_text[2]
+
+            # Unit sizes (column 3)
+            if len(cell_text) > 3:
+                prop["types"] = cell_text[3]
+
+            # Waitlist status (column 4) - "Yes", "No", "Closed"
+            if len(cell_text) > 4:
+                status_text = cell_text[4].lower()
+                if 'yes' in status_text:
+                    prop["status"] = "Waitlist Open"
+                elif 'no' in status_text or 'closed' in status_text:
+                    prop["status"] = "Waitlist Closed"
+                else:
+                    prop["status"] = cell_text[4]
+
+            # Add Foster City page URL (no individual property pages)
+            prop["url"] = "https://www.fostercity.org/commdev/page/affordable-housing-open-waitlists"
+
+            if prop.get("name"):
+                properties.append(prop)
 
     return properties if properties else None
 
@@ -597,12 +660,12 @@ def clean_html(html, url=""):
             else:
                 return "[The United Effort] No senior properties found.\n"
 
-        if "chm.org" in url:
-            properties = extract_chm_communities(soup)
+        if "fostercity.org" in url:
+            properties = extract_foster_city_properties(soup)
             if properties:
-                return format_properties(properties, "CHM Bay Area Senior Housing")
+                return format_properties(properties, "Foster City Senior Housing")
             else:
-                return "[CHM] No Bay Area communities found.\n"
+                return "[Foster City] No senior properties found.\n"
 
         # Generic housing extractor for other housing sites
         housing_domains = [
