@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 import logging
 import yaml
 import traceback
+import shutil
+import subprocess
 from notify import notify, notify_error
 
 load_dotenv()
@@ -790,6 +792,101 @@ def format_sleep_time(seconds):
     else:
         return f"{seconds // 3600} hours"
 
+def build_sudo_cmd(*cmd):
+    """Helper to add sudo -n if sudo is available."""
+    if shutil.which("sudo"):
+        return ["sudo", "-n"] + list(cmd)
+    return list(cmd)
+
+LAST_PRUNE_FILE = BASE_DIR / ".last_prune_time"
+
+def check_and_prune_disk_space():
+    try:
+        total, used, free = shutil.disk_usage("/")
+        percent_used = (used / total) * 100
+        
+        if percent_used > 80.0:
+            current_time = time.time()
+            if LAST_PRUNE_FILE.exists():
+                try:
+                    last_prune_time = float(LAST_PRUNE_FILE.read_text().strip())
+                    if current_time - last_prune_time < 86400:  # 24 hours
+                        log.info(f"Disk usage is high ({percent_used:.1f}%), but pruned recently. Skipping.")
+                        return
+                except ValueError:
+                    pass # Ignore invalid file data and proceed
+
+            # Write the current time to file to persist state across service restarts
+            LAST_PRUNE_FILE.write_text(str(current_time))
+            
+            msg = f"Disk usage is high: {percent_used:.1f}%. Starting cleanup..."
+            log.warning(msg)
+            notify(f"⚠️ *High Disk Usage Detected* ({percent_used:.1f}%)\nStarting cleanup procedures...")
+            
+            results = []
+            
+            # 1. Docker prune
+            try:
+                if shutil.which("docker"):
+                    cmd = build_sudo_cmd("docker", "system", "prune", "-af", "--volumes")
+                    docker_result = subprocess.run(
+                        cmd, 
+                        capture_output=True, text=True
+                    )
+                    output = docker_result.stdout.strip()
+                    reclaimed = [line for line in output.split('\n') if "Total reclaimed space" in line]
+                    reclaimed_text = reclaimed[0].strip() if reclaimed else "Done"
+                    results.append(f"🐳 *Docker*: {reclaimed_text}")
+            except Exception as e:
+                results.append(f"🐳 *Docker Error*: {e}")
+                
+            # 2. Journalctl vacuum
+            try:
+                if shutil.which("journalctl"):
+                    cmd = build_sudo_cmd("journalctl", "--vacuum-time=3d")
+                    journal_result = subprocess.run(
+                        cmd, 
+                        capture_output=True, text=True
+                    )
+                    output = (journal_result.stdout + "\n" + journal_result.stderr).strip()
+                    lines = [line for line in output.split('\n') if line.strip()]
+                    summary = lines[-1] if lines else "Done"
+                    # Only add if it actually deleted something
+                    if "deleted" in summary.lower() or "freed" in summary.lower() or "vacuuming" in summary.lower():
+                        results.append(f"📓 *Journal*: {summary}")
+            except Exception as e:
+                pass
+
+            # 3. apt cache clean
+            try:
+                if shutil.which("apt-get"):
+                    subprocess.run(build_sudo_cmd("apt-get", "clean"), capture_output=True)
+                    subprocess.run(build_sudo_cmd("apt-get", "autoremove", "-y"), capture_output=True)
+                    results.append("📦 *APT*: Cache cleared")
+            except Exception:
+                pass
+
+            # 4. Snap cleanup (Ubuntu specific)
+            try:
+                if shutil.which("snap"):
+                    # Command to remove disabled snaps
+                    snap_clean = "snap list --all | awk '/disabled/{print $1, $3}' | while read snapname revision; do snap remove \"$snapname\" --revision=\"$revision\"; done"
+                    cmd = build_sudo_cmd("bash", "-c", snap_clean)
+                    subprocess.run(cmd, capture_output=True)
+                    results.append("📦 *Snap*: Old revisions cleared")
+            except Exception:
+                pass
+
+            total_after, used_after, free_after = shutil.disk_usage("/")
+            percent_used_after = (used_after / total_after) * 100
+            
+            report = f"✅ *Cleanup Complete*\nDisk usage: {percent_used:.1f}% ➡️ {percent_used_after:.1f}%\n\n" + "\n".join(results)
+            notify(report)
+            log.info(f"Cleanup complete. Disk usage: {percent_used:.1f}% -> {percent_used_after:.1f}%")
+            
+    except Exception as e:
+        log.error(f"Error checking/pruning disk space: {e}")
+
 def main():
     all_urls = set(URLS) | set(SPECIAL_LINK_MONITORS.keys())
     log.info(f"Page Watcher started. Monitoring {len(all_urls)} URLs.")
@@ -799,6 +896,8 @@ def main():
 
     while True:
         try:
+            check_and_prune_disk_space()
+
             cycle_errors = []
 
             for url in all_urls:
