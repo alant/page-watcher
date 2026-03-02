@@ -771,7 +771,7 @@ def monitor_page(url):
         old_text = text_file.read_text()
         diff = difflib.unified_diff(
             old_text.splitlines(), text.splitlines(),
-            fromfile="before", tofile="after", lineterm="", n=0
+            fromfile="before", tofile="after", lineterm="", n=3
         )
         diff_lines = list(diff)
         if diff_lines:
