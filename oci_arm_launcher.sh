@@ -9,6 +9,9 @@ LOG_FILE="$SCRIPT_DIR/oci_arm_launcher.log"
 STATUS_FILE="$SCRIPT_DIR/.oci_arm_status"
 SUCCESS_FLAG="$SCRIPT_DIR/.oci_arm_success"
 
+# Add common installation paths to PATH for cron environments
+export PATH=$PATH:/home/ubuntu/bin:$HOME/bin:~/bin
+
 # Load environment variables
 if [ -f "$SCRIPT_DIR/.env" ]; then
     set -a
@@ -104,7 +107,17 @@ fi
 
 # Check OCI authentication configuration
 log "Checking OCI authentication configuration..."
-if ! oci iam region list &>/dev/null; then
+
+# Support custom OCI config path from .env or default locations
+if [ -n "$OCI_CONFIG_FILE" ]; then
+    OCI_CONFIG_ARG="--config-file $OCI_CONFIG_FILE"
+elif [ -f "/home/ubuntu/.oci/config" ] && [ ! -f "$HOME/.oci/config" ]; then
+    OCI_CONFIG_ARG="--config-file /home/ubuntu/.oci/config"
+else
+    OCI_CONFIG_ARG=""
+fi
+
+if ! oci $OCI_CONFIG_ARG iam region list &>/dev/null; then
     log "ERROR: OCI CLI authentication not configured"
     log "Please run 'oci setup config' or configure ~/.oci/config with your API key"
     echo "auth_not_configured" > "$STATUS_FILE"
@@ -152,6 +165,7 @@ oci compute instance launch \
     --display-name "$DISPLAY_NAME" \
     --assign-public-ip true \
     --wait-for-state RUNNING \
+    $OCI_CONFIG_ARG \
     $SSH_KEY_PARAM "$SSH_KEY_VALUE" \
     2>&1 | tee "$LAUNCH_LOG"
 
