@@ -89,14 +89,14 @@ install_oci_cli() {
     return 0
 }
 
-# Install OCI CLI
-if ! install_oci_cli; then
-    exit 1
+# Validate required environment variables first (before installing anything)
+if [ -z "$COMPARTMENT_ID" ] || [ -z "$SUBNET_ID" ] || [ -z "$IMAGE_ID" ] || [ -z "$AD_NAME" ] || [ -z "$DISPLAY_NAME" ]; then
+    log "OCI environment variables not configured, skipping launcher"
+    exit 0
 fi
 
-# Validate required environment variables
-if [ -z "$COMPARTMENT_ID" ] || [ -z "$SUBNET_ID" ] || [ -z "$IMAGE_ID" ] || [ -z "$AD_NAME" ] || [ -z "$DISPLAY_NAME" ]; then
-    log "ERROR: Missing required OCI environment variables"
+# Install OCI CLI only if configuration is present
+if ! install_oci_cli; then
     exit 1
 fi
 
