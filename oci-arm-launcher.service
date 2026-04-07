@@ -1,0 +1,17 @@
+[Unit]
+Description=OCI ARM Instance Launcher Service
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/page-watcher
+ExecStart=/home/ubuntu/page-watcher/oci_arm_launcher.sh
+EnvironmentFile=/home/ubuntu/page-watcher/.env
+Restart=on-failure
+RestartSec=1800
+
+# Stop trying after success
+SuccessExitStatus=0
+
+[Install]
+WantedBy=multi-user.target
