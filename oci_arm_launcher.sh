@@ -136,7 +136,10 @@ log "Attempting to create ARM instance..."
 echo "attempting" > "$STATUS_FILE"
 echo "$(date +%s)" >> "$STATUS_FILE"
 
-# Attempt to launch instance
+# Create unique log file for this run to avoid race conditions
+LAUNCH_LOG="/tmp/oci_launch_log_$$.txt"
+
+# Attempt to launch instance with --wait-for-state to ensure provisioning completes
 oci compute instance launch \
     --availability-domain "$AD_NAME" \
     --compartment-id "$COMPARTMENT_ID" \
@@ -146,15 +149,16 @@ oci compute instance launch \
     --image-id "$IMAGE_ID" \
     --display-name "$DISPLAY_NAME" \
     --assign-public-ip true \
+    --wait-for-state RUNNING \
     $SSH_KEY_PARAM "$SSH_KEY_VALUE" \
-    2>&1 | tee /tmp/oci_launch_log.txt
+    2>&1 | tee "$LAUNCH_LOG"
 
 EXIT_CODE=${PIPESTATUS[0]}
 
 if [ $EXIT_CODE -eq 0 ]; then
-    log "SUCCESS! ARM instance created."
+    log "SUCCESS! ARM instance created and running."
 
-    # Update status file and set success flag immediately to prevent repeated launches
+    # Update status file and set success flag after instance is actually running
     echo "success" > "$STATUS_FILE"
     echo "$(date +%s)" >> "$STATUS_FILE"
     touch "$SUCCESS_FLAG"
@@ -181,17 +185,19 @@ EOF
         log "WARNING: Failed to send notification (instance was created successfully)"
     fi
 
+    # Clean up log file on success
+    rm -f "$LAUNCH_LOG"
     exit 0
 else
     # Check error type
-    if grep -q "Out of host capacity" /tmp/oci_launch_log.txt; then
+    if grep -q "Out of host capacity" "$LAUNCH_LOG"; then
         log "Out of capacity. Will retry later."
         echo "out_of_capacity" > "$STATUS_FILE"
-    elif grep -q "LimitExceeded" /tmp/oci_launch_log.txt; then
+    elif grep -q "LimitExceeded" "$LAUNCH_LOG"; then
         log "Limit exceeded. You may already have instances running."
         echo "limit_exceeded" > "$STATUS_FILE"
     else
-        log "ERROR: Unknown error occurred. Check /tmp/oci_launch_log.txt"
+        log "ERROR: Unknown error occurred. Check $LAUNCH_LOG"
         echo "error" > "$STATUS_FILE"
     fi
     echo "$(date +%s)" >> "$STATUS_FILE"
