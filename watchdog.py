@@ -242,6 +242,8 @@ def get_oci_arm_status():
 
             if status == "success":
                 return f"✅ ARM instance created successfully"
+            elif status == "config_missing":
+                return f"⚠️ OCI environment variables not configured in .env"
             elif status == "auth_not_configured":
                 return f"⚠️ OCI authentication not configured - run 'oci setup config'"
             elif status == "attempting":
