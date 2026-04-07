@@ -314,7 +314,7 @@ def run_oci_arm_launcher():
             [str(launcher_script)],
             capture_output=True,
             text=True,
-            timeout=600  # 10 minute timeout (covers first-time OCI CLI install)
+            timeout=1500  # 25 minute timeout (covers OCI waiter default of 20min + install time)
         )
 
         if result.returncode == 0:
