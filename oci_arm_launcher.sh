@@ -100,6 +100,17 @@ if ! install_oci_cli; then
     exit 1
 fi
 
+# Check OCI authentication configuration
+log "Checking OCI authentication configuration..."
+if ! oci iam region list --limit 1 &>/dev/null; then
+    log "ERROR: OCI CLI authentication not configured"
+    log "Please run 'oci setup config' or configure ~/.oci/config with your API key"
+    echo "auth_not_configured" > "$STATUS_FILE"
+    echo "$(date +%s)" >> "$STATUS_FILE"
+    exit 0
+fi
+log "OCI authentication verified"
+
 # Prepare SSH key - support both file and direct key from env
 if [ -n "$SSH_AUTHORIZED_KEYS" ]; then
     # Use SSH key from environment variable via metadata

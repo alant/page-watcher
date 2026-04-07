@@ -242,6 +242,8 @@ def get_oci_arm_status():
 
             if status == "success":
                 return f"✅ ARM instance created successfully"
+            elif status == "auth_not_configured":
+                return f"⚠️ OCI authentication not configured - run 'oci setup config'"
             elif status == "attempting":
                 return f"🔄 ARM launcher running (last attempt {hours_ago:.1f}h ago)"
             elif status == "out_of_capacity":
