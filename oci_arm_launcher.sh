@@ -33,6 +33,14 @@ if [ -f "$SUCCESS_FLAG" ]; then
     exit 0
 fi
 
+# Detect Python binary early for notifications
+if [ -f "$SCRIPT_DIR/venv/bin/python3" ]; then
+    PYTHON_BIN="$SCRIPT_DIR/venv/bin/python3"
+else
+    PYTHON_BIN="python3"
+    log "WARNING: venv not found, using system python3"
+fi
+
 # Install dependencies if needed
 install_dependencies() {
     local needs_install=false
@@ -181,18 +189,12 @@ if [ $EXIT_CODE -eq 0 ]; then
     log "Success flag set, launcher will stop running"
 
     # Send notification using existing notify system with venv Python
-    if [ -f "$SCRIPT_DIR/venv/bin/python3" ]; then
-        PYTHON_BIN="$SCRIPT_DIR/venv/bin/python3"
-    else
-        PYTHON_BIN="python3"
-        log "WARNING: venv not found, using system python3"
-    fi
-
+    export ALERT_PAYLOAD="🎉 *OCI ARM Instance Created Successfully!*\n\nInstance: $DISPLAY_NAME\nShape: VM.Standard.A1.Flex (4 OCPUs, 24GB RAM)\n\nThe launcher has stopped running."
     if $PYTHON_BIN - <<EOF
-import sys
+import sys, os
 sys.path.insert(0, "$SCRIPT_DIR")
 from notify import notify
-result = notify("🎉 *OCI ARM Instance Created Successfully!*\n\nInstance: $DISPLAY_NAME\nShape: VM.Standard.A1.Flex (4 OCPUs, 24GB RAM)\n\nThe launcher has stopped running.")
+result = notify(os.environ["ALERT_PAYLOAD"])
 sys.exit(0 if result else 1)
 EOF
     then
@@ -221,18 +223,24 @@ else
         echo "error" > "$STATUS_FILE"
         ALERT_MSG="❌ *OCI ARM Launcher Error*\n\nAn unexpected error occurred while launching $DISPLAY_NAME:\n\n\`\`\`\n$ERROR_DETAIL\n\`\`\`"
         SEND_ALERT=true
+        FATAL_ERROR=true
     fi
     echo "$(date +%s)" >> "$STATUS_FILE"
 
     # Send error notification if needed
     if [ "$SEND_ALERT" = true ]; then
+        export ALERT_PAYLOAD="$ALERT_MSG"
         $PYTHON_BIN - <<EOF
-import sys
+import sys, os
 sys.path.insert(0, "$SCRIPT_DIR")
 from notify import notify
-notify("$ALERT_MSG")
+notify(os.environ["ALERT_PAYLOAD"])
 EOF
     fi
 
-    exit 1
+    if [ "$FATAL_ERROR" = true ]; then
+        exit 2
+    else
+        exit 1
+    fi
 fi

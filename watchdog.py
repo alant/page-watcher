@@ -323,10 +323,14 @@ def run_oci_arm_launcher():
         if result.returncode == 0:
             log.info("OCI ARM launcher completed successfully")
         elif result.returncode == 1:
-            # Code 1 is a known retry error (capacity, etc.) which is handled internally
-            log.info("OCI ARM launcher reported a retryable error (e.g. out of capacity)")
+            # Code 1 is specifically for "Out of Capacity", which is a retryable event
+            log.info("OCI ARM launcher reported capacity issues (will retry)")
+        elif result.returncode == 2:
+            # Code 2 is for "Limit Exceeded" or system errors that require intervention
+            log.warning(f"OCI ARM launcher reported a fatal error (exit code {result.returncode})")
+            issues.append(f"🚀 OCI launcher fatal error (Check Telegram for details)")
         else:
-            log.warning(f"OCI ARM launcher exited with code {result.returncode}")
+            log.warning(f"OCI ARM launcher crashed or exited with unknown code {result.returncode}")
             issues.append(f"🚀 OCI launcher failed (exit code {result.returncode})")
 
     except subprocess.TimeoutExpired:
