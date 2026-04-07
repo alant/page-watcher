@@ -206,17 +206,33 @@ EOF
     exit 0
 else
     # Check error type
+    SEND_ALERT=false
     if grep -q "Out of host capacity" "$LAUNCH_LOG"; then
         log "Out of capacity. Will retry later."
         echo "out_of_capacity" > "$STATUS_FILE"
     elif grep -q "LimitExceeded" "$LAUNCH_LOG"; then
         log "Limit exceeded. You may already have instances running."
         echo "limit_exceeded" > "$STATUS_FILE"
+        ALERT_MSG="⚠️ *OCI ARM Launcher Alert*\n\nLimit exceeded for $DISPLAY_NAME. You may already have ARM instances running in this tenancy."
+        SEND_ALERT=true
     else
+        ERROR_DETAIL=$(tail -n 5 "$LAUNCH_LOG" | head -n 3)
         log "ERROR: Unknown error occurred. Check $LAUNCH_LOG"
         echo "error" > "$STATUS_FILE"
+        ALERT_MSG="❌ *OCI ARM Launcher Error*\n\nAn unexpected error occurred while launching $DISPLAY_NAME:\n\n\`\`\`\n$ERROR_DETAIL\n\`\`\`"
+        SEND_ALERT=true
     fi
     echo "$(date +%s)" >> "$STATUS_FILE"
+
+    # Send error notification if needed
+    if [ "$SEND_ALERT" = true ]; then
+        $PYTHON_BIN - <<EOF
+import sys
+sys.path.insert(0, "$SCRIPT_DIR")
+from notify import notify
+notify("$ALERT_MSG")
+EOF
+    fi
 
     exit 1
 fi

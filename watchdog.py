@@ -299,16 +299,17 @@ def run_oci_arm_launcher():
     """Run OCI ARM instance launcher if not already successful."""
     launcher_script = BASE_DIR / "oci_arm_launcher.sh"
     success_flag = BASE_DIR / ".oci_arm_success"
+    issues = []
 
     # Skip if already succeeded
     if success_flag.exists():
         log.info("OCI ARM instance already created, skipping launcher")
-        return
+        return []
 
     # Skip if launcher script doesn't exist
     if not launcher_script.exists():
         log.info("OCI ARM launcher script not found, skipping")
-        return
+        return []
 
     try:
         log.info("Running OCI ARM instance launcher...")
@@ -316,18 +317,26 @@ def run_oci_arm_launcher():
             [str(launcher_script)],
             capture_output=True,
             text=True,
-            timeout=1500  # 25 minute timeout (covers OCI waiter default of 20min + install time)
+            timeout=1500  # 25 minute timeout
         )
 
         if result.returncode == 0:
             log.info("OCI ARM launcher completed successfully")
+        elif result.returncode == 1:
+            # Code 1 is a known retry error (capacity, etc.) which is handled internally
+            log.info("OCI ARM launcher reported a retryable error (e.g. out of capacity)")
         else:
             log.warning(f"OCI ARM launcher exited with code {result.returncode}")
+            issues.append(f"🚀 OCI launcher failed (exit code {result.returncode})")
 
     except subprocess.TimeoutExpired:
-        log.error("OCI ARM launcher timed out after 5 minutes")
+        log.error("OCI ARM launcher timed out after 25 minutes")
+        issues.append("🚀 OCI launcher timed out")
     except Exception as e:
         log.error(f"Error running OCI ARM launcher: {e}")
+        issues.append(f"🚀 OCI launcher error: {e}")
+
+    return issues
 
 
 def main():
@@ -353,6 +362,11 @@ def main():
     if not ok:
         issues.append(f"❌ {msg}")
 
+    # Check 4: OCI ARM launcher (every 30 minutes with watchdog)
+    launcher_issues = run_oci_arm_launcher()
+    if launcher_issues:
+        issues.extend(launcher_issues)
+
     # Send alert if any issues
     if issues:
         alert = "🚨 **Page Watcher Alert**\n\n" + "\n".join(issues) + "\n\nCheck the server!"
@@ -360,9 +374,6 @@ def main():
         notify(alert, is_error=True)
     else:
         log.info("All checks passed")
-
-    # Run OCI ARM launcher (every 30 minutes with watchdog)
-    run_oci_arm_launcher()
 
     # Send daily heartbeat if it's time
     if should_send_heartbeat():
