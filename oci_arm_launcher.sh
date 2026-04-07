@@ -102,7 +102,7 @@ fi
 
 # Check OCI authentication configuration
 log "Checking OCI authentication configuration..."
-if ! oci iam region list --limit 1 &>/dev/null; then
+if ! oci iam region list &>/dev/null; then
     log "ERROR: OCI CLI authentication not configured"
     log "Please run 'oci setup config' or configure ~/.oci/config with your API key"
     echo "auth_not_configured" > "$STATUS_FILE"
