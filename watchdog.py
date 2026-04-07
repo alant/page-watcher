@@ -246,6 +246,8 @@ def get_oci_arm_status():
                 return f"⚠️ OCI environment variables not configured in .env"
             elif status == "auth_not_configured":
                 return f"⚠️ OCI authentication not configured - run 'oci setup config'"
+            elif status == "ssh_key_missing":
+                return f"🔑 SSH public key not found (check ~/.ssh/id_rsa.pub or .env)"
             elif status == "attempting":
                 return f"🔄 ARM launcher running (last attempt {hours_ago:.1f}h ago)"
             elif status == "out_of_capacity":

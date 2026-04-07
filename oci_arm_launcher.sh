@@ -125,13 +125,30 @@ else
     OCI_CONFIG_ARG=""
 fi
 
-if ! oci $OCI_CONFIG_ARG iam region list &>/dev/null; then
-    log "ERROR: OCI CLI authentication not configured"
-    log "Please run 'oci setup config' or configure ~/.oci/config with your API key"
-    echo "auth_not_configured" > "$STATUS_FILE"
+# Capture error output to differentiate between auth and transient errors
+AUTH_ERROR_LOG="/tmp/oci_auth_check_$$.txt"
+if ! oci $OCI_CONFIG_ARG iam region list 2>"$AUTH_ERROR_LOG" >/dev/null; then
+    if grep -q "NotAuthenticated" "$AUTH_ERROR_LOG"; then
+        log "ERROR: OCI CLI authentication not configured"
+        log "Please run 'oci setup config' or configure ~/.oci/config with your API key"
+        echo "auth_not_configured" > "$STATUS_FILE"
+    else
+        log "ERROR: OCI CLI runtime error (check $AUTH_ERROR_LOG)"
+        echo "error" > "$STATUS_FILE"
+        # Send an immediate notification for runtime errors (connectivity etc)
+        export ALERT_PAYLOAD="❌ *OCI Launcher Runtime Error*\n\n$(head -n 2 "$AUTH_ERROR_LOG")"
+        $PYTHON_BIN - <<EOF
+import sys, os
+sys.path.insert(0, "$SCRIPT_DIR")
+from notify import notify
+notify(os.environ["ALERT_PAYLOAD"])
+EOF
+    fi
     echo "$(date +%s)" >> "$STATUS_FILE"
-    exit 0
+    rm -f "$AUTH_ERROR_LOG"
+    exit 2
 fi
+rm -f "$AUTH_ERROR_LOG"
 log "OCI authentication verified"
 
 # Prepare SSH key - support both file and direct key from env
@@ -146,7 +163,9 @@ else
     SSH_KEY_FILE="${SSH_KEY_FILE:-$HOME/.ssh/id_rsa.pub}"
     if [ ! -f "$SSH_KEY_FILE" ]; then
         log "ERROR: SSH public key not found at $SSH_KEY_FILE and SSH_AUTHORIZED_KEYS not set"
-        exit 1
+        echo "ssh_key_missing" > "$STATUS_FILE"
+        echo "$(date +%s)" >> "$STATUS_FILE"
+        exit 2
     fi
     log "Using SSH key from file: $SSH_KEY_FILE"
     SSH_KEY_PARAM="--ssh-authorized-keys-file"
