@@ -216,12 +216,51 @@ def get_recent_changes():
         return f"Error checking changes: {e}"
 
 
+def get_oci_arm_status():
+    """Check OCI ARM instance launcher status."""
+    status_file = BASE_DIR / ".oci_arm_status"
+    success_flag = BASE_DIR / ".oci_arm_success"
+
+    # Check if already succeeded
+    if success_flag.exists():
+        return "✅ ARM instance created successfully (launcher stopped)"
+
+    # Check current status
+    if not status_file.exists():
+        return "⏸️ ARM launcher not started yet"
+
+    try:
+        with open(status_file, "r") as f:
+            lines = f.read().strip().split("\n")
+            if len(lines) < 2:
+                return "⚠️ ARM launcher status unknown"
+
+            status = lines[0]
+            timestamp = int(lines[1])
+            last_attempt = datetime.fromtimestamp(timestamp)
+            hours_ago = (datetime.now() - last_attempt).total_seconds() / 3600
+
+            if status == "attempting":
+                return f"🔄 ARM launcher running (last attempt {hours_ago:.1f}h ago)"
+            elif status == "out_of_capacity":
+                return f"⏳ Waiting for capacity (last attempt {hours_ago:.1f}h ago)"
+            elif status == "limit_exceeded":
+                return f"⚠️ Limit exceeded - check existing instances"
+            elif status == "error":
+                return f"❌ Error occurred (last attempt {hours_ago:.1f}h ago)"
+            else:
+                return f"❓ Unknown status: {status}"
+    except Exception as e:
+        return f"⚠️ Error reading ARM status: {e}"
+
+
 def send_heartbeat():
     """Send weekly heartbeat message with crawl summary."""
     now = datetime.now()
 
     crawl_summary = get_crawl_summary()
     recent_changes = get_recent_changes()
+    oci_status = get_oci_arm_status()
 
     msg = f"""💓 *Page Watcher Weekly Report*
 
@@ -231,6 +270,8 @@ def send_heartbeat():
 {crawl_summary}
 
 *Activity:* {recent_changes}
+
+*OCI ARM Launcher:* {oci_status}
 
 Monitor is running normally."""
 
