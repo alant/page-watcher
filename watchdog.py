@@ -289,6 +289,41 @@ Monitor is running normally."""
         return False
 
 
+def run_oci_arm_launcher():
+    """Run OCI ARM instance launcher if not already successful."""
+    launcher_script = BASE_DIR / "oci_arm_launcher.sh"
+    success_flag = BASE_DIR / ".oci_arm_success"
+
+    # Skip if already succeeded
+    if success_flag.exists():
+        log.info("OCI ARM instance already created, skipping launcher")
+        return
+
+    # Skip if launcher script doesn't exist
+    if not launcher_script.exists():
+        log.info("OCI ARM launcher script not found, skipping")
+        return
+
+    try:
+        log.info("Running OCI ARM instance launcher...")
+        result = subprocess.run(
+            [str(launcher_script)],
+            capture_output=True,
+            text=True,
+            timeout=300  # 5 minute timeout
+        )
+
+        if result.returncode == 0:
+            log.info("OCI ARM launcher completed successfully")
+        else:
+            log.warning(f"OCI ARM launcher exited with code {result.returncode}")
+
+    except subprocess.TimeoutExpired:
+        log.error("OCI ARM launcher timed out after 5 minutes")
+    except Exception as e:
+        log.error(f"Error running OCI ARM launcher: {e}")
+
+
 def main():
     log.info("Watchdog check starting...")
 
@@ -319,6 +354,9 @@ def main():
         notify(alert, is_error=True)
     else:
         log.info("All checks passed")
+
+    # Run OCI ARM launcher (every 30 minutes with watchdog)
+    run_oci_arm_launcher()
 
     # Send daily heartbeat if it's time
     if should_send_heartbeat():

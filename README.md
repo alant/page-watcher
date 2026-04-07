@@ -62,22 +62,7 @@ add the following to run the watchdog every 30 minutes
 
 ## OCI ARM Instance Launcher
 
-The OCI ARM launcher automatically attempts to create Oracle Cloud ARM always-free instances every 30 minutes until successful.
-
-Setup the systemd service:
-```bash
-sudo cp oci-arm-launcher.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable oci-arm-launcher
-sudo systemctl start oci-arm-launcher
-```
-
-Check status:
-```bash
-sudo systemctl status oci-arm-launcher
-sudo journalctl -u oci-arm-launcher -f
-tail -f oci_arm_launcher.log
-```
+The OCI ARM launcher is integrated into the watchdog and automatically attempts to create Oracle Cloud ARM always-free instances every 30 minutes (when the watchdog runs) until successful.
 
 The launcher will:
 - Automatically install OCI CLI and dependencies if missing
@@ -87,8 +72,10 @@ The launcher will:
 - Stop running after successful instance creation
 - Report status in weekly watchdog reports
 
-Stop the launcher:
+No additional setup required - it runs automatically with the existing watchdog cron job.
+
+Check logs:
 ```bash
-sudo systemctl stop oci-arm-launcher
-sudo systemctl disable oci-arm-launcher
+tail -f oci_arm_launcher.log
+tail -f watchdog.log
 ```
