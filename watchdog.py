@@ -240,7 +240,9 @@ def get_oci_arm_status():
             last_attempt = datetime.fromtimestamp(timestamp)
             hours_ago = (datetime.now() - last_attempt).total_seconds() / 3600
 
-            if status == "attempting":
+            if status == "success":
+                return f"✅ ARM instance created successfully"
+            elif status == "attempting":
                 return f"🔄 ARM launcher running (last attempt {hours_ago:.1f}h ago)"
             elif status == "out_of_capacity":
                 return f"⏳ Waiting for capacity (last attempt {hours_ago:.1f}h ago)"

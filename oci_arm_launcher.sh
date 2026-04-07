@@ -143,9 +143,11 @@ EXIT_CODE=${PIPESTATUS[0]}
 if [ $EXIT_CODE -eq 0 ]; then
     log "SUCCESS! ARM instance created."
 
-    # Update status file
+    # Update status file and set success flag immediately to prevent repeated launches
     echo "success" > "$STATUS_FILE"
     echo "$(date +%s)" >> "$STATUS_FILE"
+    touch "$SUCCESS_FLAG"
+    log "Success flag set, launcher will stop running"
 
     # Send notification using existing notify system with venv Python
     if [ -f "$SCRIPT_DIR/venv/bin/python3" ]; then
@@ -155,7 +157,6 @@ if [ $EXIT_CODE -eq 0 ]; then
         log "WARNING: venv not found, using system python3"
     fi
 
-    NOTIFY_SUCCESS=false
     if $PYTHON_BIN - <<EOF
 import sys
 sys.path.insert(0, "$SCRIPT_DIR")
@@ -165,15 +166,8 @@ sys.exit(0 if result else 1)
 EOF
     then
         log "Notification sent successfully"
-        NOTIFY_SUCCESS=true
     else
-        log "WARNING: Failed to send notification, will retry on next run"
-    fi
-
-    # Only set success flag if notification succeeded
-    if [ "$NOTIFY_SUCCESS" = true ]; then
-        touch "$SUCCESS_FLAG"
-        log "Success flag set, launcher will stop running"
+        log "WARNING: Failed to send notification (instance was created successfully)"
     fi
 
     exit 0
