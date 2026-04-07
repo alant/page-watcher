@@ -310,7 +310,7 @@ def run_oci_arm_launcher():
             [str(launcher_script)],
             capture_output=True,
             text=True,
-            timeout=300  # 5 minute timeout
+            timeout=600  # 10 minute timeout (covers first-time OCI CLI install)
         )
 
         if result.returncode == 0:

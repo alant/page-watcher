@@ -143,10 +143,9 @@ EXIT_CODE=${PIPESTATUS[0]}
 if [ $EXIT_CODE -eq 0 ]; then
     log "SUCCESS! ARM instance created."
 
-    # Mark as successful
+    # Update status file
     echo "success" > "$STATUS_FILE"
     echo "$(date +%s)" >> "$STATUS_FILE"
-    touch "$SUCCESS_FLAG"
 
     # Send notification using existing notify system with venv Python
     if [ -f "$SCRIPT_DIR/venv/bin/python3" ]; then
@@ -156,12 +155,26 @@ if [ $EXIT_CODE -eq 0 ]; then
         log "WARNING: venv not found, using system python3"
     fi
 
-    $PYTHON_BIN - <<EOF
+    NOTIFY_SUCCESS=false
+    if $PYTHON_BIN - <<EOF
 import sys
 sys.path.insert(0, "$SCRIPT_DIR")
 from notify import notify
-notify("🎉 *OCI ARM Instance Created Successfully!*\n\nInstance: $DISPLAY_NAME\nShape: VM.Standard.A1.Flex (4 OCPUs, 24GB RAM)\n\nThe launcher has stopped running.")
+result = notify("🎉 *OCI ARM Instance Created Successfully!*\n\nInstance: $DISPLAY_NAME\nShape: VM.Standard.A1.Flex (4 OCPUs, 24GB RAM)\n\nThe launcher has stopped running.")
+sys.exit(0 if result else 1)
 EOF
+    then
+        log "Notification sent successfully"
+        NOTIFY_SUCCESS=true
+    else
+        log "WARNING: Failed to send notification, will retry on next run"
+    fi
+
+    # Only set success flag if notification succeeded
+    if [ "$NOTIFY_SUCCESS" = true ]; then
+        touch "$SUCCESS_FLAG"
+        log "Success flag set, launcher will stop running"
+    fi
 
     exit 0
 else
