@@ -8,6 +8,7 @@ Run via cron every 30 minutes:
 
 import os
 import subprocess
+import signal
 import logging
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -315,29 +316,40 @@ def run_oci_arm_launcher():
 
     try:
         log.info("Running OCI ARM instance launcher...")
-        result = subprocess.run(
+        # Use start_new_session=True (Python 3.2+) to create a process group
+        # This ensures all children can be killed together on timeout
+        proc = subprocess.Popen(
             [str(launcher_script)],
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=1500  # 25 minute timeout
+            start_new_session=True
         )
 
-        if result.returncode == 0:
-            log.info("OCI ARM launcher completed successfully")
-        elif result.returncode == 1:
-            # Code 1 is specifically for "Out of Capacity", which is a retryable event
-            log.info("OCI ARM launcher reported capacity issues (will retry)")
-        elif result.returncode == 2:
-            # Code 2 is for "Limit Exceeded" or system errors that require intervention
-            log.warning(f"OCI ARM launcher reported a fatal error (exit code {result.returncode})")
-            issues.append(f"🚀 OCI launcher fatal error (Check Telegram for details)")
-        else:
-            log.warning(f"OCI ARM launcher crashed or exited with unknown code {result.returncode}")
-            issues.append(f"🚀 OCI launcher failed (exit code {result.returncode})")
+        try:
+            stdout, stderr = proc.communicate(timeout=1500) # 25 minute timeout
+            
+            if proc.returncode == 0:
+                log.info("OCI ARM launcher completed successfully")
+            elif proc.returncode == 1:
+                # Code 1 is specifically for "Out of Capacity", which is a retryable event
+                log.info("OCI ARM launcher reported capacity issues (will retry)")
+            elif proc.returncode == 2:
+                # Code 2 is for "Limit Exceeded" or system errors that require intervention
+                log.warning(f"OCI ARM launcher reported a fatal error (exit code {proc.returncode})")
+                issues.append(f"🚀 OCI launcher fatal error (Check Telegram for details)")
+            else:
+                log.warning(f"OCI ARM launcher crashed or exited with unknown code {proc.returncode}")
+                issues.append(f"🚀 OCI launcher failed (exit code {proc.returncode})")
+                
+        except subprocess.TimeoutExpired:
+            log.error("OCI ARM launcher timed out after 25 minutes - killing process group")
+            # Kill the entire process group (including all children)
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+            # Wait for clean up
+            proc.communicate()
+            issues.append("🚀 OCI launcher timed out and was terminated")
 
-    except subprocess.TimeoutExpired:
-        log.error("OCI ARM launcher timed out after 25 minutes")
-        issues.append("🚀 OCI launcher timed out")
     except Exception as e:
         log.error(f"Error running OCI ARM launcher: {e}")
         issues.append(f"🚀 OCI launcher error: {e}")
