@@ -385,8 +385,20 @@ def run_oci_arm_launcher():
             )
             # Kill the entire process group (including all children)
             os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-            # Wait for clean up
-            proc.communicate()
+
+            # Wait for clean shutdown with bounded timeout
+            try:
+                proc.communicate(timeout=10)
+                log.info("Process group terminated cleanly after SIGTERM")
+            except subprocess.TimeoutExpired:
+                # Process didn't exit after SIGTERM, escalate to SIGKILL
+                log.warning("Process group did not respond to SIGTERM, sending SIGKILL")
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                    proc.communicate(timeout=5)
+                except Exception as e:
+                    log.error(f"Error during SIGKILL cleanup: {e}")
+
             issues.append("🚀 OCI launcher timed out and was terminated")
 
     except Exception as e:
