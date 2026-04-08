@@ -59,3 +59,23 @@ add the following to run the watchdog every 30 minutes
 ```cron
 */30 * * * * /home/ubuntu/page-watcher/venv/bin/python /home/ubuntu/page-watcher/watchdog.py >> /home/ubuntu/page-watcher/cron.log 2>&1
 ```
+
+## OCI ARM Instance Launcher
+
+The OCI ARM launcher is integrated into the watchdog and automatically attempts to create Oracle Cloud ARM always-free instances every 30 minutes (when the watchdog runs) until successful.
+
+The launcher will:
+- Automatically install OCI CLI and dependencies if missing
+- Attempt to create VM.Standard.A1.Flex instance (4 OCPUs, 24GB RAM)
+- Retry every 30 minutes when capacity is unavailable
+- Send notification via Telegram/Discord on success
+- Stop running after successful instance creation
+- Report status in weekly watchdog reports
+
+No additional setup required - it runs automatically with the existing watchdog cron job.
+
+Check logs:
+```bash
+tail -f oci_arm_launcher.log
+tail -f watchdog.log
+```

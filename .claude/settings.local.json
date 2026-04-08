@@ -19,7 +19,8 @@
       "WebFetch(domain:chm.org)",
       "WebFetch(domain:www.chm.org)",
       "WebFetch(domain:housing.sfgov.org)",
-      "WebFetch(domain:sfmohcd.org)"
+      "WebFetch(domain:sfmohcd.org)",
+      "Bash(chmod:*)"
     ]
   }
 }

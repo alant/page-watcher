@@ -194,3 +194,7 @@ cython_debug/
 .cursorindexingignore
 
 page-history/
+
+# OCI ARM Launcher Status
+.oci_arm_status
+.oci_arm_success
