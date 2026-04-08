@@ -19,7 +19,7 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
     set +a
 else
     echo "Error: .env file not found."
-    exit 1
+    exit 2
 fi
 
 # Logging function
@@ -110,7 +110,7 @@ fi
 
 # Install OCI CLI only if configuration is present
 if ! install_oci_cli; then
-    exit 1
+    exit 2
 fi
 
 # Check OCI authentication configuration
@@ -180,6 +180,8 @@ echo "$(date +%s)" >> "$STATUS_FILE"
 
 # Create unique log file for this run to avoid race conditions
 LAUNCH_LOG="/tmp/oci_launch_log_$$.txt"
+# Ensure the temp log is cleaned up on any exit (success, failure, or signal)
+trap 'rm -f "$LAUNCH_LOG"' EXIT
 
 # Attempt to launch instance with --wait-for-state to ensure provisioning completes
 oci compute instance launch \
@@ -222,8 +224,7 @@ EOF
         log "WARNING: Failed to send notification (instance was created successfully)"
     fi
 
-    # Clean up log file on success
-    rm -f "$LAUNCH_LOG"
+    # SUCCESS! The trap will clean up LAUNCH_LOG
     exit 0
 else
     # Check error type
@@ -236,6 +237,7 @@ else
         echo "limit_exceeded" > "$STATUS_FILE"
         ALERT_MSG="⚠️ *OCI ARM Launcher Alert*\n\nLimit exceeded for $DISPLAY_NAME. You may already have ARM instances running in this tenancy."
         SEND_ALERT=true
+        FATAL_ERROR=true
     else
         ERROR_DETAIL=$(tail -n 5 "$LAUNCH_LOG" | head -n 3)
         log "ERROR: Unknown error occurred. Check $LAUNCH_LOG"

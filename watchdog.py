@@ -6,19 +6,21 @@ Run via cron every 30 minutes:
 */30 * * * * /home/ubuntu/page-watcher/venv/bin/python /home/ubuntu/page-watcher/watchdog.py >> /home/ubuntu/page-watcher/cron.log 2>&1
 """
 
-import os
-import subprocess
-import signal
 import logging
+import os
+import signal
+import subprocess
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
 from pathlib import Path
+
+import yaml
+from dotenv import load_dotenv
 
 # Load env before importing notify (which also loads env, but just to be safe)
 BASE_DIR = Path(__file__).parent.resolve()
 load_dotenv(BASE_DIR / ".env")
 
-from notify import notify, send_telegram, send_discord
+from notify import notify, send_discord, send_telegram
 
 LOG_FILE = BASE_DIR / "monitor.log"
 WATCHDOG_LOG = BASE_DIR / "watchdog.log"
@@ -27,7 +29,7 @@ HEARTBEAT_FILE = BASE_DIR / ".last_heartbeat"
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.FileHandler(WATCHDOG_LOG), logging.StreamHandler()]
+    handlers=[logging.FileHandler(WATCHDOG_LOG), logging.StreamHandler()],
 )
 log = logging.getLogger(__name__)
 
@@ -42,6 +44,7 @@ HEARTBEAT_HOUR = 10  # 10 AM PST
 def parse_interval(interval_str):
     """Parse interval string like '3h' or '30m' to seconds."""
     import re
+
     match = re.match(r"(\d+)([smhd])", interval_str.strip().lower())
     if not match:
         raise ValueError(f"Invalid interval format: {interval_str}")
@@ -77,7 +80,9 @@ def check_service_status():
     try:
         result = subprocess.run(
             ["systemctl", "is-active", "page-watcher"],
-            capture_output=True, text=True, timeout=10
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         status = result.stdout.strip()
         if status == "active":
@@ -130,27 +135,27 @@ def should_send_heartbeat():
 def get_crawl_summary():
     """
     Fetch pages and count total properties to verify crawler is working.
-    Uses unfiltered URLs to get true property counts per county.
+    Loads URLs from urls_config.yaml (midpen, eden, other_housing sections).
     """
     import requests
     from bs4 import BeautifulSoup
 
     summary = []
 
-    # URLs without waitlist filter - just to verify crawler can find properties
-    # MidPen requires full params including empty city filter and asp_ls
+    # Load housing URLs from urls_config.yaml — single source of truth
+    config_path = BASE_DIR / "urls_config.yaml"
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+
     verification_urls = [
-        ("MidPen Santa Clara", "https://www.midpen-housing.org/find-housing/?p_asid=1&p_asp_data=1&aspf[county__4]=Santa%20Clara&aspf[city__3]=&aspf[type__2]=Senior&filters_initial=0&filters_changed=1&qtranslate_lang=0&current_page_id=23&asp_ls="),
-        ("MidPen Alameda", "https://www.midpen-housing.org/find-housing/?p_asid=1&p_asp_data=1&aspf[county__4]=Alameda&aspf[city__3]=&aspf[type__2]=Senior&filters_initial=0&filters_changed=1&qtranslate_lang=0&current_page_id=23&asp_ls="),
-        ("MidPen San Mateo", "https://www.midpen-housing.org/find-housing/?p_asid=1&p_asp_data=1&aspf[county__4]=San%20Mateo&aspf[city__3]=&aspf[type__2]=Senior&filters_initial=0&filters_changed=1&qtranslate_lang=0&current_page_id=23&asp_ls="),
-        ("MidPen San Francisco", "https://www.midpen-housing.org/find-housing/?p_asid=1&p_asp_data=1&aspf[county__4]=San%20Francisco&aspf[city__3]=&aspf[type__2]=Senior&filters_initial=0&filters_changed=1&qtranslate_lang=0&current_page_id=23&asp_ls="),
-        ("Eden Santa Clara", "https://edenhousing.org/find-an-apartment/find-a-home/search-for-an-apartment/?_sft_county=santa-clara"),
-        ("Eden Alameda", "https://edenhousing.org/find-an-apartment/find-a-home/search-for-an-apartment/?_sft_county=alameda"),
-        ("Charities Housing", "https://charitieshousing.org/find-a-home/"),
-        ("SAHA Homes", "https://www.sahahomes.org/properties/"),
+        (entry["name"], entry["url"])
+        for section in ("midpen", "eden", "other_housing")
+        for entry in config.get(section, [])
     ]
 
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
 
     for name, url in verification_urls:
         try:
@@ -168,7 +173,9 @@ def get_crawl_summary():
                 count = len(unique_hrefs)
             elif "edenhousing.org" in url:
                 # Eden: count property listings
-                props = soup.find_all("div", class_=lambda c: c and "property-listing" in c)
+                props = soup.find_all(
+                    "div", class_=lambda c: c and "property-listing" in c
+                )
                 count = len(props)
             elif "charitieshousing.org" in url:
                 # Charities: count apartment cards
@@ -179,7 +186,8 @@ def get_crawl_summary():
                 props = soup.find_all("div", class_="map-popup-item")
                 count = len(props)
             else:
-                count = 0
+                summary.append(f"  {name}: reachable")
+                continue
 
             summary.append(f"  {name}: {count} properties")
         except Exception as e:
@@ -203,7 +211,9 @@ def get_recent_changes():
                     # Parse timestamp from log line
                     try:
                         timestamp_str = line.split("[")[0].strip()
-                        timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S,%f")
+                        timestamp = datetime.strptime(
+                            timestamp_str, "%Y-%m-%d %H:%M:%S,%f"
+                        )
                         if timestamp > week_ago:
                             change_count += 1
                     except:
@@ -273,7 +283,7 @@ def send_heartbeat():
 
     msg = f"""💓 *Page Watcher Weekly Report*
 
-{now.strftime('%Y-%m-%d %H:%M')}
+{now.strftime("%Y-%m-%d %H:%M")}
 
 *Crawl Summary:*
 {crawl_summary}
@@ -323,27 +333,56 @@ def run_oci_arm_launcher():
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            start_new_session=True
+            start_new_session=True,
         )
 
         try:
-            stdout, stderr = proc.communicate(timeout=1500) # 25 minute timeout
-            
+            stdout, stderr = proc.communicate(timeout=1500)  # 25 minute timeout
+
             if proc.returncode == 0:
                 log.info("OCI ARM launcher completed successfully")
             elif proc.returncode == 1:
-                # Code 1 is specifically for "Out of Capacity", which is a retryable event
-                log.info("OCI ARM launcher reported capacity issues (will retry)")
+                # Exit code 1 is intended for "Out of Capacity" retryable events only.
+                # Cross-check the status file to catch any other code path that exits 1
+                # (e.g. an unexpected shell error, future regression), which would otherwise
+                # be silently swallowed and never escalated.
+                status_file = BASE_DIR / ".oci_arm_status"
+                actual_status = None
+                if status_file.exists():
+                    try:
+                        actual_status = status_file.read_text().strip().split("\n")[0]
+                    except Exception as read_err:
+                        log.warning(f"Could not read OCI ARM status file: {read_err}")
+
+                if actual_status == "out_of_capacity":
+                    log.info("OCI ARM launcher reported capacity issues (will retry)")
+                else:
+                    log.warning(
+                        f"OCI ARM launcher exited with code 1 but status file reports "
+                        f"'{actual_status}' — not a capacity miss, treating as fatal"
+                    )
+                    issues.append(
+                        f"🚀 OCI launcher exited unexpectedly "
+                        f"(exit code 1, status: {actual_status})"
+                    )
             elif proc.returncode == 2:
                 # Code 2 is for "Limit Exceeded" or system errors that require intervention
-                log.warning(f"OCI ARM launcher reported a fatal error (exit code {proc.returncode})")
-                issues.append(f"🚀 OCI launcher fatal error (Check Telegram for details)")
+                log.warning(
+                    f"OCI ARM launcher reported a fatal error (exit code {proc.returncode})"
+                )
+                issues.append(
+                    f"🚀 OCI launcher fatal error (Check Telegram for details)"
+                )
             else:
-                log.warning(f"OCI ARM launcher crashed or exited with unknown code {proc.returncode}")
+                log.warning(
+                    f"OCI ARM launcher crashed or exited with unknown code {proc.returncode}"
+                )
                 issues.append(f"🚀 OCI launcher failed (exit code {proc.returncode})")
-                
+
         except subprocess.TimeoutExpired:
-            log.error("OCI ARM launcher timed out after 25 minutes - killing process group")
+            log.error(
+                "OCI ARM launcher timed out after 25 minutes - killing process group"
+            )
             # Kill the entire process group (including all children)
             os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
             # Wait for clean up
@@ -387,7 +426,11 @@ def main():
 
     # Send alert if any issues
     if issues:
-        alert = "🚨 **Page Watcher Alert**\n\n" + "\n".join(issues) + "\n\nCheck the server!"
+        alert = (
+            "🚨 **Page Watcher Alert**\n\n"
+            + "\n".join(issues)
+            + "\n\nCheck the server!"
+        )
         log.warning(f"Issues detected, sending alert: {issues}")
         notify(alert, is_error=True)
     else:
