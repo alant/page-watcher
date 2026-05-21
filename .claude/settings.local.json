@@ -20,7 +20,8 @@
       "WebFetch(domain:www.chm.org)",
       "WebFetch(domain:housing.sfgov.org)",
       "WebFetch(domain:sfmohcd.org)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "WebFetch(domain:www.doki8.net)"
     ]
   }
 }
