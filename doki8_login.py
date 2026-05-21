@@ -49,15 +49,8 @@ def _solve_captcha(page_html: str) -> int | None:
         log.error("mc-input has no parent <span>")
         return None
 
-    # Render span text with "?" in place of the input element
-    parts = []
-    for node in span.children:
-        if hasattr(node, "get"):  # Tag node
-            if node.get("id") == "mc-input":
-                parts.append("?")
-        else:
-            parts.append(str(node))
-    span_clean = "".join(parts).strip()
+    mc_input.replace_with("?")
+    span_clean = span.get_text().strip()
     log.info("Captcha span: %s", span_clean)
 
     # Parse:  A op ? = B   or   ? op A = B
@@ -73,32 +66,52 @@ def _solve_captcha(page_html: str) -> int | None:
         log.info("Captcha equation: ? %s %d = %d", op, a, b)
         return _apply_op_left(op, a, b)
 
+    # A op B = ?  →  evaluate directly
+    m = re.match(rf"(\d+)\s*({_OP_RE})\s*(\d+)\s*=\s*\?", span_clean)
+    if m:
+        a, op, b = int(m.group(1)), m.group(2), int(m.group(3))
+        log.info("Captcha equation: %d %s %d = ?", a, op, b)
+        return _evaluate(a, op, b)
+
     log.error("Unrecognised captcha format: %s", span_clean)
+    return None
+
+
+def _evaluate(a: int, op: str, b: int) -> int | None:
+    """Compute  a op b."""
+    if op == "+":
+        return a + b
+    if op in ("-", "−"):
+        return a - b
+    if op in ("×", "*", "x", "X"):
+        return a * b
+    if op in ("÷", "/"):
+        return a // b if b else None
     return None
 
 
 def _apply_op_right(a: int, op: str, b: int) -> int | None:
     """Solve  a op ? = b  →  return ?"""
-    if op in ("+",):
+    if op == "+":
         return b - a
     if op in ("-", "−"):
         return a - b
-    if op in ("×", "*", "x", "X", "×"):
+    if op in ("×", "*", "x", "X"):
         return b // a if a else None
-    if op in ("÷", "/", "÷"):
+    if op in ("÷", "/"):
         return a // b if b else None
     return None
 
 
 def _apply_op_left(op: str, a: int, b: int) -> int | None:
     """Solve  ? op a = b  →  return ?"""
-    if op in ("+",):
+    if op == "+":
         return b - a
     if op in ("-", "−"):
         return b + a
-    if op in ("×", "*", "x", "X", "×"):
+    if op in ("×", "*", "x", "X"):
         return b // a if a else None
-    if op in ("÷", "/", "÷"):
+    if op in ("÷", "/"):
         return b * a
     return None
 
