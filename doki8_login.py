@@ -11,6 +11,7 @@ import sys
 import time
 
 import requests
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
 from notify import notify
@@ -38,27 +39,35 @@ def _solve_captcha(page_html: str) -> int | None:
       A op ? = B  →  <span>A op <input/> = B</span>
       ? op A = B  →  <span><input/> op A = B</span>
     """
-    span_m = re.search(r"<span>(.*?)</span>", page_html, re.DOTALL)
-    if not span_m:
+    soup = BeautifulSoup(page_html, "html.parser")
+    mc_input = soup.find("input", {"id": "mc-input"})
+    if not mc_input:
+        log.error("mc-input field not found in page")
         return None
-    span = html.unescape(span_m.group(1))
+    span = mc_input.find_parent("span")
+    if not span:
+        log.error("mc-input has no parent <span>")
+        return None
 
-    # Replace the input element with the placeholder token "?"
-    span_clean = re.sub(r"<input[^>]*/?>", "?", span).strip()
+    # Render span text with "?" in place of the input element
+    parts = []
+    for node in span.children:
+        if hasattr(node, "get"):  # Tag node
+            if node.get("id") == "mc-input":
+                parts.append("?")
+        else:
+            parts.append(str(node))
+    span_clean = "".join(parts).strip()
     log.info("Captcha span: %s", span_clean)
 
     # Parse:  A op ? = B   or   ? op A = B
-    m = re.match(
-        rf"(\d+)\s*({_OP_RE})\s*\?\s*=\s*(\d+)", span_clean
-    )
+    m = re.match(rf"(\d+)\s*({_OP_RE})\s*\?\s*=\s*(\d+)", span_clean)
     if m:
         a, op, b = int(m.group(1)), m.group(2), int(m.group(3))
         log.info("Captcha equation: %d %s ? = %d", a, op, b)
         return _apply_op_right(a, op, b)
 
-    m = re.match(
-        rf"\?\s*({_OP_RE})\s*(\d+)\s*=\s*(\d+)", span_clean
-    )
+    m = re.match(rf"\?\s*({_OP_RE})\s*(\d+)\s*=\s*(\d+)", span_clean)
     if m:
         op, a, b = m.group(1), int(m.group(2)), int(m.group(3))
         log.info("Captcha equation: ? %s %d = %d", op, a, b)
@@ -77,7 +86,7 @@ def _apply_op_right(a: int, op: str, b: int) -> int | None:
     if op in ("×", "*", "x", "X", "×"):
         return b // a if a else None
     if op in ("÷", "/", "÷"):
-        return a * b
+        return a // b if b else None
     return None
 
 
@@ -133,19 +142,20 @@ def login() -> bool:
 
     try:
         post_resp = session.post(LOGIN_URL, data=payload, timeout=20, allow_redirects=True)
+        post_resp.raise_for_status()
     except Exception as e:
         log.error("POST request failed: %s", e)
         notify(f"❌ *doki8 login failed* — POST error\n`{e}`", is_error=True)
         return False
 
-    # Step 3: Detect success — a successful WP login redirects away from /login
-    # and sets a wordpress_logged_in_* cookie
+    # Step 3: Detect success — a successful WP login sets a wordpress_logged_in_* cookie
+    # and redirects away from /login. Both conditions must agree; HTTP errors above already
+    # short-circuit so a non-2xx response never reaches here.
     logged_in_cookie = any(
         c.name.startswith("wordpress_logged_in") for c in session.cookies
     )
-    still_on_login = "loginform" in post_resp.text
 
-    if logged_in_cookie or not still_on_login:
+    if logged_in_cookie:
         log.info("Login succeeded (final URL: %s)", post_resp.url)
         return True
 
