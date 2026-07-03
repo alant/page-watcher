@@ -188,7 +188,7 @@ oci compute instance launch \
     --availability-domain "$AD_NAME" \
     --compartment-id "$COMPARTMENT_ID" \
     --shape "VM.Standard.A1.Flex" \
-    --shape-config '{"ocpus": 4, "memoryInGBs": 24}' \
+    --shape-config '{"ocpus": 2, "memoryInGBs": 12}' \
     --subnet-id "$SUBNET_ID" \
     --image-id "$IMAGE_ID" \
     --display-name "$DISPLAY_NAME" \
@@ -210,7 +210,7 @@ if [ $EXIT_CODE -eq 0 ]; then
     log "Success flag set, launcher will stop running"
 
     # Send notification using existing notify system with venv Python
-    export ALERT_PAYLOAD="🎉 *OCI ARM Instance Created Successfully!*\n\nInstance: $DISPLAY_NAME\nShape: VM.Standard.A1.Flex (4 OCPUs, 24GB RAM)\n\nThe launcher has stopped running."
+    export ALERT_PAYLOAD="🎉 *OCI ARM Instance Created Successfully!*\n\nInstance: $DISPLAY_NAME\nShape: VM.Standard.A1.Flex (2 OCPUs, 12GB RAM)\n\nThe launcher has stopped running."
     if $PYTHON_BIN - <<EOF
 import sys, os
 sys.path.insert(0, "$SCRIPT_DIR")
